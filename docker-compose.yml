@@ -1,0 +1,45 @@
+services:
+  mc_assistant_bot:
+    build: .
+    container_name: mc_assistant_bot
+    restart: unless-stopped
+    environment:
+      - DOCKER_HOST=${DOCKER_HOST:-tcp://docker-socket-proxy:2375}
+      - PYTHONUNBUFFERED=1
+    stop_grace_period: 15s
+    init: true
+    networks:
+      - socket-net
+    depends_on:
+      docker-socket-proxy:
+        condition: service_healthy
+    volumes:
+      # Mount the .env file so runtime container_name modifications persist onto the host
+      - ./.env:/app/.env
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy
+    container_name: docker-socket-proxy
+    restart: always
+    privileged: true # Often required to access the host socket in hardened environments
+    environment:
+      - CONTAINERS=${PROXY_CONTAINERS:-1}
+      - POST=${PROXY_POST:-1}
+      - EXEC=${PROXY_EXEC:-1}
+      - IMAGES=${PROXY_IMAGES:-0}
+      - NETWORKS=${PROXY_NETWORKS:-0}
+      - VOLUMES=${PROXY_VOLUMES:-0}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./haproxy.cfg.template:/usr/local/etc/haproxy/haproxy.cfg.template:ro
+    networks:
+      - socket-net
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "2375" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+networks:
+  socket-net:
+    driver: bridge
