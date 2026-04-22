@@ -1,0 +1,1 @@
+/home/glhrm/.local/share/agnman/rules/context-orientation.md
